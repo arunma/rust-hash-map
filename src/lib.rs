@@ -138,6 +138,43 @@ impl<'a, K, V> IntoIterator for &'a HashMap<K, V> {
     }
 }
 
+struct IntoIter<K, V> {
+    map: HashMap<K, V>,
+    bucket_size: usize,
+}
+
+impl<K, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.map.buckets.get_mut(self.bucket_size) {
+                Some(bucket) => match bucket.pop() {
+                    Some(x) => break Some(x),
+                    None => {
+                        self.bucket_size += 1;
+                        continue;
+                    }
+                },
+                None => break None,
+            }
+        }
+    }
+}
+
+impl<K, V> IntoIterator for HashMap<K, V> {
+    type Item = (K, V);
+
+    type IntoIter = IntoIter<K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            map: self,
+            bucket_size: 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,10 +208,39 @@ mod tests {
 
         //let expected = [("foo", 42), ("bar1", 43), ("bar2", 44), ("bar3", 45)];
 
-        for (key, value) in &hmap {
+        for (&key, &value) in &hmap {
             println!("{:?} : {:?}", key, value);
+            match key {
+                "foo" => assert_eq!(value, 42),
+                "bar1" => assert_eq!(value, 43),
+                "bar2" => assert_eq!(value, 44),
+                "bar3" => assert_eq!(value, 45),
+                _ => unreachable!(),
+            }
         }
-
         assert_eq!(hmap.len(), 4)
+    }
+    #[test]
+    fn test_consuming_iter() {
+        let mut hmap = HashMap::new();
+        hmap.insert("foo", 42);
+        hmap.insert("bar1", 43);
+        hmap.insert("bar2", 44);
+        hmap.insert("bar3", 45);
+
+        //let expected = [("foo", 42), ("bar1", 43), ("bar2", 44), ("bar3", 45)];
+        let mut count = 0;
+        for (key, value) in hmap {
+            count += 1;
+            println!("{:?} : {:?}", key, value);
+            match key {
+                "foo" => assert_eq!(value, 42),
+                "bar1" => assert_eq!(value, 43),
+                "bar2" => assert_eq!(value, 44),
+                "bar3" => assert_eq!(value, 45),
+                _ => unreachable!(),
+            }
+        }
+        assert_eq!(count, 4)
     }
 }
